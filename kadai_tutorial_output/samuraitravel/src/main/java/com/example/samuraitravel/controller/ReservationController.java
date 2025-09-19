@@ -5,7 +5,9 @@ import java.time.LocalDate;
 import jakarta.servlet.http.HttpServletRequest;
 
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.domain.Sort.Direction;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -29,21 +31,24 @@ import com.example.samuraitravel.repository.ReservationRepository;
 import com.example.samuraitravel.security.UserDetailsImpl;
 import com.example.samuraitravel.service.ReservationService;
 import com.example.samuraitravel.service.StripeService;
+import com.example.samuraitravel.service.HouseDetailService;
 
 @Controller
 public class ReservationController {
     private final ReservationRepository reservationRepository;   
     private final HouseRepository houseRepository;
-    private final ReservationService reservationService; 
-    private final StripeService stripeService; 
+    private final ReservationService reservationService;
+    private final StripeService stripeService;
+    private final HouseDetailService houseDetailService;
 
-    public ReservationController(ReservationRepository reservationRepository, HouseRepository houseRepository, ReservationService reservationService, StripeService stripeService) { 
-        this.reservationRepository = reservationRepository; 
+    public ReservationController(ReservationRepository reservationRepository, HouseRepository houseRepository, ReservationService reservationService, StripeService stripeService, HouseDetailService houseDetailService) {
+        this.reservationRepository = reservationRepository;
         this.houseRepository = houseRepository;
         this.reservationService = reservationService;
         this.stripeService = stripeService;
+        this.houseDetailService = houseDetailService;
 
-    }    
+    }
 
     @GetMapping("/reservations")
     public String index(@AuthenticationPrincipal UserDetailsImpl userDetailsImpl, @PageableDefault(page = 0, size = 10, sort = "id", direction = Direction.ASC) Pageable pageable, Model model) {
@@ -62,9 +67,10 @@ public class ReservationController {
                         //@ModelAttribute：フォームからのデータ受取り @Validated：入力チェックする
                         BindingResult bindingResult,
                         RedirectAttributes redirectAttributes,
+                        @AuthenticationPrincipal UserDetailsImpl userDetailsImpl,
                         Model model)
-    {   
-    	//
+    {
+        //
         House house = houseRepository.getReferenceById(id);
         //予約人数を取得する　Formから
         Integer numberOfPeople = reservationInputForm.getNumberOfPeople();   
@@ -81,9 +87,10 @@ public class ReservationController {
             }            
         }         
         
-        if (bindingResult.hasErrors()) {            
-            model.addAttribute("house", house);            
-            model.addAttribute("errorMessage", "予約内容に不備があります。"); 
+        if (bindingResult.hasErrors()) {
+            model.addAttribute("house", house);
+            model.addAttribute("errorMessage", "予約内容に不備があります。");
+            houseDetailService.prepareHouseDetail(model, house, PageRequest.of(0, 5, Sort.by(Direction.DESC, "createdAt")), userDetailsImpl != null ? userDetailsImpl.getUser() : null);
             return "houses/show";
         }
         

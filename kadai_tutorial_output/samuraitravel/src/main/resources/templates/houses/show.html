@@ -31,7 +31,15 @@
                             
                             <div th:if="${errorMessage}" class="alert alert-danger">
                                 <span th:text="${errorMessage}"></span>
-                            </div>                                                                         
+                            </div>
+
+                            <div th:if="${reviewSuccessMessage}" class="alert alert-success">
+                                <span th:text="${reviewSuccessMessage}"></span>
+                            </div>
+
+                            <div th:if="${reviewErrorMessage}" class="alert alert-danger">
+                                <span th:text="${reviewErrorMessage}"></span>
+                            </div>
                             
                             <div class="mb-4">
                                 <img th:if="${house.getImageName()}" th:src="@{/storage/__${house.getImageName()}__}" class="w-100" alt="民宿画像">
@@ -144,7 +152,101 @@
                                             </div>
                                         </div>  
                                     </div>                                                                                                                                                                                             
-                                </div>                                                                                             
+                                </div>
+
+                                <div class="mt-5">
+                                    <h2 class="mb-4">レビュー</h2>
+
+                                    <div th:if="${reviewPage.isEmpty()}" class="alert alert-secondary">
+                                        まだレビューは投稿されていません。
+                                    </div>
+
+                                    <div th:each="review : ${reviewPage}" class="border rounded p-3 mb-3">
+                                        <div class="d-flex justify-content-between align-items-center">
+                                            <div>
+                                                <span class="fw-bold" th:text="${review.getUser().getName()}"></span>
+                                                <small class="text-muted ms-2" th:text="${#temporals.format(review.getCreatedAt(), 'yyyy/MM/dd HH:mm')}"></small>
+                                            </div>
+                                            <div class="text-warning fs-5" th:text="${review.getStarRating()}"></div>
+                                        </div>
+                                        <p class="mt-3 mb-0 samuraitravel-pre-wrap" th:text="${review.getComment()}"></p>
+                                        <div sec:authorize="isAuthenticated()" th:if="${existingReview != null and review.getId() == existingReview.getId()}" class="mt-3 text-end">
+                                            <form method="post" th:action="@{/houses/{houseId}/reviews/{reviewId}/delete(houseId=${house.getId()}, reviewId=${review.getId()})}">
+                                                <input type="hidden" name="page" th:value="${reviewPage.getNumber()}">
+                                                <button type="submit" class="btn btn-outline-danger btn-sm" onclick="return confirm('レビューを削除しますか？');">削除する</button>
+                                            </form>
+                                        </div>
+                                    </div>
+
+                                    <div th:if="${reviewPage.getTotalPages() > 1}" class="d-flex justify-content-center mt-4">
+                                        <nav aria-label="レビュー一覧ページ">
+                                            <ul class="pagination">
+                                                <li class="page-item">
+                                                    <span th:if="${reviewPage.isFirst()}" class="page-link disabled">前</span>
+                                                    <a th:unless="${reviewPage.isFirst()}" th:href="@{/houses/{id}(id=${house.getId()}, page=${reviewPage.getNumber() - 1})}" class="page-link samuraitravel-page-link">前</a>
+                                                </li>
+                                                <li th:each="i : ${#numbers.sequence(0, reviewPage.getTotalPages() - 1)}" class="page-item">
+                                                    <span th:if="${i == reviewPage.getNumber()}" class="page-link active samuraitravel-active" th:text="${i + 1}"></span>
+                                                    <a th:unless="${i == reviewPage.getNumber()}" th:href="@{/houses/{id}(id=${house.getId()}, page=${i})}" class="page-link samuraitravel-page-link" th:text="${i + 1}"></a>
+                                                </li>
+                                                <li class="page-item">
+                                                    <span th:if="${reviewPage.isLast()}" class="page-link disabled">次</span>
+                                                    <a th:unless="${reviewPage.isLast()}" th:href="@{/houses/{id}(id=${house.getId()}, page=${reviewPage.getNumber() + 1})}" class="page-link samuraitravel-page-link">次</a>
+                                                </li>
+                                            </ul>
+                                        </nav>
+                                    </div>
+
+                                    <div class="mt-5">
+                                        <h3 class="mb-3" th:text="${existingReview == null ? 'レビューを投稿する' : 'レビューを編集する'}"></h3>
+
+                                        <div sec:authorize="isAnonymous()" class="alert alert-info">
+                                            レビューを投稿するには<a th:href="@{/login}">ログイン</a>が必要です。
+                                        </div>
+
+                                        <div sec:authorize="isAuthenticated()">
+                                            <form th:if="${existingReview == null}" method="post" th:action="@{/houses/{houseId}/reviews(houseId=${house.getId()})}" th:object="${reviewForm}" class="mb-0">
+                                                <div class="form-group mb-3">
+                                                    <label for="rating" class="fw-bold">評価</label>
+                                                    <div th:if="${#fields.hasErrors('rating')}" class="text-danger small mb-2" th:errors="*{rating}"></div>
+                                                    <select class="form-select" th:field="*{rating}">
+                                                        <option value="" hidden>選択してください</option>
+                                                        <option th:each="i : ${#numbers.sequence(1, 5)}" th:value="${i}" th:text="${i}"></option>
+                                                    </select>
+                                                </div>
+                                                <div class="form-group mb-4">
+                                                    <label for="comment" class="fw-bold">コメント</label>
+                                                    <div th:if="${#fields.hasErrors('comment')}" class="text-danger small mb-2" th:errors="*{comment}"></div>
+                                                    <textarea class="form-control" th:field="*{comment}" rows="4"></textarea>
+                                                </div>
+                                                <input type="hidden" name="page" th:value="${reviewPage.getNumber()}">
+                                                <div class="form-group">
+                                                    <button type="submit" class="btn text-white shadow-sm samuraitravel-btn">投稿する</button>
+                                                </div>
+                                            </form>
+
+                                            <form th:if="${existingReview != null}" method="post" th:action="@{/houses/{houseId}/reviews/{reviewId}/update(houseId=${house.getId()}, reviewId=${existingReview.getId()})}" th:object="${reviewForm}" class="mb-0">
+                                                <div class="form-group mb-3">
+                                                    <label for="rating" class="fw-bold">評価</label>
+                                                    <div th:if="${#fields.hasErrors('rating')}" class="text-danger small mb-2" th:errors="*{rating}"></div>
+                                                    <select class="form-select" th:field="*{rating}">
+                                                        <option value="" hidden>選択してください</option>
+                                                        <option th:each="i : ${#numbers.sequence(1, 5)}" th:value="${i}" th:text="${i}"></option>
+                                                    </select>
+                                                </div>
+                                                <div class="form-group mb-4">
+                                                    <label for="comment" class="fw-bold">コメント</label>
+                                                    <div th:if="${#fields.hasErrors('comment')}" class="text-danger small mb-2" th:errors="*{comment}"></div>
+                                                    <textarea class="form-control" th:field="*{comment}" rows="4"></textarea>
+                                                </div>
+                                                <input type="hidden" name="page" th:value="${reviewPage.getNumber()}">
+                                                <div class="form-group">
+                                                    <button type="submit" class="btn text-white shadow-sm samuraitravel-btn">更新する</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
